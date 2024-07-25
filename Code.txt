@@ -1,38 +1,34 @@
-sbit LCD_RS at RB4_bit;
-sbit LCD_EN at RB5_bit;
-sbit LCD_D4 at RB0_bit;
-sbit LCD_D5 at RB1_bit;
-sbit LCD_D6 at RB2_bit;
-sbit LCD_D7 at RB3_bit;
+#include <xc.h>
+#define _XTAL_FREQ 20000000  // Define oscillator frequency for delay
 
-sbit LCD_RS_Direction at TRISB4_bit;
-sbit LCD_EN_Direction at TRISB5_bit;
-sbit LCD_D4_Direction at TRISB0_bit;
-sbit LCD_D5_Direction at TRISB1_bit;
-sbit LCD_D6_Direction at TRISB2_bit;
-sbit LCD_D7_Direction at TRISB3_bit;
-int Adread;
-float voltage;
-char volt[4];
-void main() {
-
-PORTA = 0;
-TRISA = 0X01;
-PORTB = 0;
-TRISB = 0;
-LCD_Init();
-ADC_Init();
-LCD_Cmd(_LCD_CURSOR_OFF);
-LCD_Cmd(_LCD_CLEAR);
-LCD_Out(1, 1, "Digital voltmeter");
-delay_ms(1000);
-while (1)
-{
-voltage = ADC_Read(0);
-voltage = (voltage * 5 * 10)/ (1024);
-inttostr(voltage,volt); // it converts integer value into string
-Lcd_Out(2,1,"Voltage = ");
-Lcd_Out(2,11,Ltrim(volt));
-Lcd_Out(2,13,"Volt");
+void ADC_Init(){
+    ADCON0 = 0x41;  // Turn ON ADC and select Fosc/8 as the conversion clock
+    ADCON1 = 0x80;  // Configure ADC voltage reference and result format (right justified)
 }
+
+unsigned int ADC_Read(unsigned char channel){
+    if(channel > 7) return 0;  // ADC has 8 channels, 0-7
+    ADCON0 &= 0xC5;  // Clear existing channel selection bits
+    ADCON0 |= channel << 3;  // Set new channel
+    __delay_ms(2);  // Acquisition time to charge the hold capacitor
+    GO_nDONE = 1;  // Start ADC conversion
+    while(GO_nDONE);  // Wait for conversion to complete
+    return ((ADRESH << 8) + ADRESL);  // Return result
+}
+
+void main(){
+    unsigned int adc_value;
+    float voltage, input_voltage;
+
+    TRISA = 0xFF;  // Configure PORTA as input
+    ADC_Init();  // Initialize ADC
+
+    while(1){
+        adc_value = ADC_Read(0);  // Read ADC value from channel 0
+        voltage = (adc_value * 5.0) / 1023.0;  // Assuming Vref+ is 5V and 10-bit ADC resolution
+        input_voltage = voltage * ((100.0 + 3.3) / 3.3);  // Convert to input voltage
+
+        // Now you can use input_voltage as needed
+        __delay_ms(500);  // Delay for a while
+    }
 }
